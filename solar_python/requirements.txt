@@ -1,7 +1,7 @@
-folium @ file:///home/conda/feedstock_root/build_artifacts/folium_1740766619747/work
-numpy @ file:///C:/b/abs_0123vcxhf8/croot/numpy_and_numpy_base_1725470331966/work/dist/numpy-2.0.1-cp312-cp312-win_amd64.whl#sha256=e3e9d7fcaa32e9aa86aa46a7191a47fc4c4b35942462bbbedd17c45ef934dccd
+folium
+numpy
 numpy-financial==1.0.0
-pandas @ file:///C:/b/abs_e18w9ay4we/croot/pandas_1732735115740/work/dist/pandas-2.2.3-cp312-cp312-win_amd64.whl#sha256=2c8058e41dda2e7ecfff0740ad1d98f17d528c740f71b038c523a9d24d2321b0
+pandas
 plotly==6.0.1
 rasterio==1.4.3
 streamlit==1.45.0
