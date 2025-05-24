@@ -6,7 +6,7 @@ import io # para crear buffer en memoria
 def subida_formato():
     st.subheader("Sube un archivo con tu información")
     st.info("Utiliza el formato a continuación, en donde podrás ingresar tus datos de consumo de energía mensuales obtenidos de tus facturas.",icon="ℹ️")
-    ruta_archivo = 'C:/Users/Dell/Documents/Analisis_Datos/VCode/solar_python/formato_ingreso_datos.xlsx'
+    ruta_archivo = 'solar_python/formato_ingreso_datos.xlsx'
     st.session_state["archivo_datos"] = None
     with open(ruta_archivo, "rb") as f:
         st.download_button(
