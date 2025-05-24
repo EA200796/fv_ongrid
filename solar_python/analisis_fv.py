@@ -341,7 +341,7 @@ def main ():
         
             ##########
             # Carpeta con los 12 archivos raster mensuales (.tif)
-            ruta_rasters = 'solar_python'
+            ruta_rasters = 'solar_python/monthly_pvout'
             archivos_raster = sorted(glob.glob(os.path.join(ruta_rasters, '*.tif')))
             # Función para extraer valor de un punto en cada raster
             valores_mensuales = []
