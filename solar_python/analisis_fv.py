@@ -12,6 +12,10 @@ from plotly.subplots import make_subplots
 from streamlit_folium import folium_static
 from streamlit_folium import st_folium
 import folium
+from carga_datos import subida_tabla, subida_checkbox, subida_formato
+from datetime import datetime
+import io # para crear buffer en memoria
+
 
 # Configuración inicial
 ## Titulo de la pestaña y configuracion de la bara lateral
@@ -26,9 +30,34 @@ def main ():
     st.sidebar.header('🧾 Ingreso de datos') # título
 
     ################
+
+    # Cargador de archivos
+
+    archivo_datos = None
+
+    # menu de opciones de carga
+    menu = ['Subir archivo', 'Llenar tabla', 'Selecciona los aparatos en tu hogar']
+    
+    # boton de radio para opcion de carga
+    choice = st.sidebar.radio("📥 Carga tus datos aquí",menu)
+    st.sidebar.info('Escoge una de las siguientes opciones para hacerlo.',icon='ℹ️')
+    
+    if choice == "Subir archivo":
+        subida_formato()
+    elif choice == "Llenar tabla":
+        subida_tabla()
+    elif choice == "Selecciona los aparatos en tu hogar":
+        subida_checkbox()
+    else:
+        st.subheader("Saludos, selecciona una opción de carga")
+
+    archivo_datos = st.session_state.get("archivo_datos",None)
+   
+
+    #######
     with st.popover("Selecciona tus coordenadas"):
         # Carpeta con el archivo raster GHI (.tif)
-        ruta_ghi = 'solar_python/ghi/GHI.tif'
+        ruta_ghi = 'C:/Users/Dell/Documents/Analisis_Datos/VCode/solar_python/ghi/GHI.tif'
 
         ##############
         # --- Inicializar estado ---
@@ -78,7 +107,7 @@ def main ():
 
         # --- Mostrar coordenadas actuales finales ---
         st.success(f"✅ Coordenadas seleccionadas: lat = {st.session_state['lat']}, lon = {st.session_state['lon']}")
-                
+            
     #############
 
     # Validar si se ingresaron valores distintos de cero (como señal de entrada válida)
@@ -106,7 +135,7 @@ def main ():
         st.stop()
     # Ingreso de datos de cobertura consumo y factor de perdidas
     # Generar opciones de 0% a 100% en pasos de 0.5
-    opciones_porcentaje = np.round(np.arange(0, 100.5, 0.5), 1).tolist()
+    opciones_porcentaje = np.round(np.arange(0, 100, 1), 1).tolist()
 
     objetivo_cobertura = st.sidebar.select_slider(
         "✅ Objetivo de cobertura (%):", 
@@ -121,42 +150,106 @@ def main ():
         )
     factor_perdidas = (100 - factor_perdidas)/100
 
-    vida_util = st.sidebar.number_input('Vida útil (años):',
+    vida_util = st.sidebar.number_input('⌛ Vida útil (años):',
         min_value= 0,
         max_value= 30,
         value=25)
 
-    mantenimiento_anual = st.sidebar.number_input('Mantenimiento anual ($):',
+    años_proyecto = st.sidebar.number_input('⌛ Horizonte financiero (años):',
+        min_value= 0,
+        max_value= 20,
+        value=20,
+        help="El número de años que decides analizar para calcular la rentabilidad financiera (15 - 20 años es recomendable)")
+    
+    mantenimiento_anual = st.sidebar.number_input('🔧 Mantenimiento anual ($):',
         min_value= 0,
         max_value= 100, 
         value=20)
-       
-    # Cargador de archivos
-    archivo_datos = st.sidebar.file_uploader("Subir CSV o Excel:", type = ["csv", "xlsx"])
     
+    tasa_descuento = st.sidebar.number_input(
+        label="💸 Tasa de descuento o Tasa de oportunidad",
+        min_value= 0.00,
+        max_value= 1.00,
+        step= 0.01,
+        value= 0.08,
+        format= "%0.002f",
+        help="Tasa de oportunidad que estás usando como referencia para evaluar si el proyecto es financieramente conveniente.")
+    
+    costo_Wp = st.sidebar.number_input("💸 Costo por Wp", value=1.2, help="Cuánto cuesta instalar 1 watt de potencia nominal del sistema solar.")
+    ########
+    ### trabajando datos
+ #########            
+ # Procesar si se subió o creó un DataFrame
     if archivo_datos is not None:
-        tipo_archivo = archivo_datos.type
         
-        # Verificar el tipo de archivo y cargarlo
-        if tipo_archivo == "text/csv":
-            df = pd.read_csv(archivo_datos)
-        elif tipo_archivo == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-            df = pd.read_excel(archivo_datos)
+        # Si es un archivo subido
+        if hasattr(archivo_datos, "type"):  # ← Verifica si es un archivo (tiene tipo MIME)
+            tipo_archivo = archivo_datos.type
+
+            try:
+                if tipo_archivo == "text/csv":
+                    df = pd.read_csv(archivo_datos)
+                elif tipo_archivo == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+                    df = pd.read_excel(archivo_datos)
+                else:
+                    st.warning("⚠️ Formato de archivo no compatible")
+                    df = pd.DataFrame()
+            except Exception as e:
+                st.error(f"❌ Error al leer el archivo: {e}")
+                df = pd.DataFrame()
         else:
-            st.warning("Formato de archivo no compatible")
-            df = pd.DataFrame()
+            # Si ya es un DataFrame (como en tabla editable o checkbox futuro)
+            df = archivo_datos
+
+        # Guardar en session_state para otros módulos
+        st.session_state["df"] = df
+        st.success("✅ Datos cargados correctamente")
         
-        # Guardar el DataFrame en `session_state`
-        st.session_state['df'] = df
          
-        # Mostrar el DataFrame
+        # Trabajando con el DataFrame
+        # Obtener el año actual (por ejemplo, 2024)
+        anio_actual = datetime.now().year
         if not df.empty:
                       
             # Elimnación de espacios innecesarios (principio y final)
             df.columns = df.columns.str.strip()
 
             # Se cambia la columna 'Fecha' a tipo datetime
-            df['Fecha']=pd.to_datetime(df['Fecha'], format = 'mixed')
+            if choice != "Selecciona los aparatos en tu hogar":
+                df['Fecha']=pd.to_datetime(df['Fecha'], format = 'mixed')
+            else:
+                # Crear 12 fechas: primer día de cada mes del año actual
+                fechas = pd.date_range(start=f"{anio_actual}-01-01", periods=12, freq="MS")
+                
+                # Tomando en cuenta que df contiene el consumo diario estimado de checkbox
+                # Repetimos el consumo diario total por cada mes
+                consumo_diario = df["Consumo subtotal"].sum()
+                consumo_mensual_estimado = consumo_diario * 30  # aproximación mensual
+
+                # Crear nuevo DataFrame de 12 meses
+                df = pd.DataFrame({
+                    "Fecha": fechas,
+                    "Consumo subtotal": [consumo_mensual_estimado] * 12,
+                    "Monto": df["Monto"].sum() * 12,
+                    "Total_pagar": df['Total_pagar'].sum() * 12
+                })
+
+                        # Convertir DataFrae a archivo Excel en memoria
+                st.session_state["df"] = df
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                    df.to_excel(writer, index=False, sheet_name="Datos")
+
+                # Reposicionar el cursor al inicio del buffer
+                output.seek(0)
+
+                # Boton de descarga
+                st.download_button(
+                    label="📤 Descargar archivo Excel",
+                    data=output,
+                    file_name="formato_ingresado.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
 
             # Lista de columnas a limpiar y redondear
             columnas = ["Monto", "Total_pagar"]
@@ -206,7 +299,7 @@ def main ():
             tarifa_mas_impuestos = pago_total_promedio_usd / consumo_promedio_kWh
             st.session_state['tarifa_mas_impuestos'] = tarifa_mas_impuestos
             
-            tarifa_mas_impuestos_ctvs = (pago_total_promedio_usd / consumo_promedio_kWh)*100
+            #tarifa_mas_impuestos_ctvs = (pago_total_promedio_usd / consumo_promedio_kWh)*100
             
             st.session_state['tarifa_promedio_usd_kWh'] = tarifa_promedio_usd_kWh
             
@@ -235,9 +328,9 @@ def main ():
                 class_usuario = ""
                 if consumo_promedio_kWh >50 and consumo_promedio_kWh < 120:
                     class_usuario = "Residencial urbano, inyección cero recomendada."
-                elif consumo_promedio_kWh > 120 and class_usuario < 800:
+                elif consumo_promedio_kWh > 120 and consumo_promedio_kWh < 800:
                     class_usuario = "Comercio mediano, Net billing posible."
-                elif consumo_promedio_kWh > 800 and class_usuario < 5000:
+                elif consumo_promedio_kWh > 800 and consumo_promedio_kWh < 5000:
                     class_usuario = "Industrial pequeño, requiere memoria técnica detallada."
                 elif consumo_promedio_kWh < 50:
                     class_usuario = "Rural aislado, preferencia por autonomía energética."
@@ -248,7 +341,7 @@ def main ():
         
             ##########
             # Carpeta con los 12 archivos raster mensuales (.tif)
-            ruta_rasters = 'solar_python/monthly_pvout'
+            ruta_rasters = 'C:/Users/Dell/Documents/Analisis_Datos/VCode/solar_python/monthly_pvout'
             archivos_raster = sorted(glob.glob(os.path.join(ruta_rasters, '*.tif')))
             # Función para extraer valor de un punto en cada raster
             valores_mensuales = []
@@ -290,31 +383,26 @@ def main ():
             ##########
             # Análisis económico
             tarifa_promedio_usd_kWh = st.session_state.get('tarifa_promedio_usd_kWh')
-            costo_Wp = 1.20
+            
             inversion_usd = tamano_sistema_kWp * 1000 * costo_Wp
 
             ahorro_mensual = consumo_promedio_kWh * tarifa_promedio_usd_kWh
             ahorro_anual = ahorro_mensual * 12
-            payback = inversion_usd / ahorro_anual
-
+            
             ############
             # Proyección a largo plazo
             # Parámetros de entrada
-            #vida_util = 25
             incremento_tarifa = 0.02
-            #mantenimiento_anual = 20
-
+            
             # Cálculos base
             produccion_prom_kWp_mes = radiacion_diaria * 30 * factor_perdidas
-            sistema_kwp = (consumo_promedio_kWh * objetivo_cobertura) / produccion_prom_kWp_mes
-            costo_total = sistema_kwp * 1000 * costo_Wp
-
+                        
             # Producción mensual por año
             produccion_anual = []
             tarifa_actual = tarifa_mas_impuestos
 
-            for anio in range(1, vida_util + 1):
-                produccion_mensual = sistema_kwp * produccion_prom_kWp_mes * factores_relativos  * (1 - 0.005) ** (anio - 1)
+            for anio in range(1, años_proyecto + 1):
+                produccion_mensual = tamano_sistema_kWp * produccion_prom_kWp_mes * factores_relativos  * (1 - 0.005) ** (anio - 1)
                 produccion_anual_kwh = np.sum(produccion_mensual)
                 
                 ingreso_anual = produccion_anual_kwh * tarifa_actual
@@ -324,16 +412,19 @@ def main ():
                 tarifa_actual *= (1 + incremento_tarifa)
 
             # Indicadores económicos
-            flujo_de_caja = [-costo_total] + produccion_anual
+            flujo_de_caja = [-inversion_usd] + produccion_anual
 
             # Verifica que no haya NaN ni Inf
+            van = None
             if np.any(np.isnan(flujo_de_caja)) or np.any(np.isinf(flujo_de_caja)):
                 st.error("⚠️ El flujo de caja contiene valores inválidos (NaN o Inf).")
                 tir = None
             else:
                 tir = npf.irr(flujo_de_caja)
+                van = npf.npv(tasa_descuento, flujo_de_caja)
+                flujo_acumulado = np.cumsum(flujo_de_caja)
+                payback_anio = next((i for i, val in enumerate(flujo_acumulado) if val >= 0), "Más de 20 años")
 
-            van = npf.npv(0.08, flujo_de_caja)
             
 
             interpretacion_van = ""
@@ -352,11 +443,14 @@ def main ():
                     interpretacion_tir = f"🔄 Rentabilidad justa - Evaluar con otros criterios."
                 else:
                     interpretacion_tir = f"❌ No rentable - No se recomienda invertir."
+                
+                st.markdown(f"**Payback:** {payback_anio} años")
+            
             else:
                 st.error("⚠️ El TIR contiene valores inválidos (NaN o Inf). Revisa los cálculos anteriores.")
             ########## Diseño de dashboard
             # Columnas
-            left, right = st.columns(2, vertical_alignment="top", border=True)
+            left, right = st.columns([0.4, 0.6], vertical_alignment="top", border=True)
 
             left.markdown("## 📍 ¡Tu proyecto se encuetra aquí!")
             def mapa_ubic():
@@ -371,7 +465,7 @@ def main ():
                     f"☀️ Radiación solar diaria media: {radiacion_diaria:.2f} kWh/m²/día<br>"
                     f"🔧 Tamaño recomendado del sistema para cubrir el {objetivo_cobertura*100:.0f}% del consumo: {tamano_sistema_kWp:.2f} kWp<br>"
                     f"✅ Producción mensual estimada ({tamano_sistema_kWp:.2f} kWp): {produccion_mensual_prom:.2f} kWh<br>"
-                    f"💸 Inversión inicial: ${costo_total:.2f}"
+                    f"💸 Inversión inicial: ${inversion_usd:.2f}"
                 )
 
                 # Agregar un marcador con resumen de consumo
@@ -403,8 +497,8 @@ def main ():
                 </div>
                 """, unsafe_allow_html=True)
                 st.write(f"\n💸 Total promedio a pagar (incluye impuestos y tasas municipales): ${Total_pagar_promedio:.2f}.")
-                st.write(f"\n💸 Tarifa promedio por el consumo: ${tarifa_promedio_usd_kWh:.3f}/kWh.")
-                st.write(f"\n💸 Tarifa promedio + impuestos: ${tarifa_mas_impuestos:.3f}/kWh.\n")
+                st.write(f"\n💸 Tarifa promedio por el consumo: ${tarifa_promedio_usd_kWh:.3f}/kWh. En base a los datos.")
+                st.write(f"\n💸 Tarifa promedio + impuestos: ${tarifa_mas_impuestos:.3f}/kWh. En base a los datos.\n")
                 
                 st.title('☀️ Condiciones Solares y Técnicas')
                 st.write(f"✅ Radiación solar diaria media: {radiacion_diaria:.2f} kWh/m²/día)")
@@ -420,17 +514,20 @@ def main ():
                 st.write(f"\n✅ Costo referencial (USD/Wp): ${costo_Wp:.2f}")
                 st.write(f"\n✅ Inversión estimada ({tamano_sistema_kWp:.2f} kWp): ${inversion_usd:,.2f}")
                 st.write(f"\n✅ Ahorro anual: ${ahorro_anual:.2f}")
-                st.write(f"\n✅Tiempo de retorno de inversión (payback): {payback:.1f} años")
 
                 st.title('📈 Proyección a Largo Plazo')
-                st.write(f"\n🔧 Tamaño del sistema: {sistema_kwp:.2f} kWp")
-                st.write(f"\n💸 Inversión inicial: ${costo_total:.2f}")
-                st.write(f"\n📈 Valor Actual Neto - VAN (8%): ${van:.2f} {interpretacion_van}")
-                st.write(f"\n📊 Tasa Interna de Retorno - TIR: {tir*100:.1f}% {interpretacion_tir}")
-                st.write(f"\n💰 Ahorro total neto en 25 años: ${sum(produccion_anual):.2f}")
+                st.write(f"\n🔧 Tamaño del sistema: {tamano_sistema_kWp:.2f} kWp")
+                st.write(f"\n💸 Inversión inicial: ${inversion_usd:.2f}")
+                if van != None:
+                    st.write(f"\n📈 Valor Actual Neto - VAN (8%): ${van:.2f} {interpretacion_van}")
+                    st.write(f"\n📊 Tasa Interna de Retorno - TIR: {tir*100:.1f}% {interpretacion_tir}")
+                st.write(f"\n💰 Ahorro total neto en {vida_util} años: ${sum(produccion_anual):.2f}")
             
 
             def crear_graficos_interactivos(df):
+                df['Total_pagar']=df['Total_pagar'].fillna(0)
+                df['Monto'] = df['Monto'].fillna(0)
+                
                 fig = make_subplots(
                     rows=2, cols=1,
                     shared_xaxes=True,
@@ -579,11 +676,12 @@ def main ():
                 st.plotly_chart(fig, use_container_width=True)
 
                 # Mostrar indicadores financieros clave
-                st.subheader("📊 Indicadores Financieros")
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("VAN", f"${van:,.2f}")
-                col2.metric("TIR", f"{tir:.2%}")
-                col3.metric("Payback", f"Año {payback_anio}" if payback_anio is not None else "No recuperado")
+                if van != None:
+                    st.subheader("📊 Indicadores Financieros")
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("VAN", f"${van:,.2f}")
+                    col2.metric("TIR", f"{tir:.2%}")
+                    col3.metric("Payback", f"Año {payback_anio}" if payback_anio is not None else "No recuperado")
 
             ##################
             def cobertura_solar():
@@ -651,9 +749,9 @@ def main ():
             with st.container(border=True):    
                 cobertura_solar()
         else:
-            st.warning("El archivo está vacío o no se pudo procesar.")
+            st.warning("⚠️ El archivo está vacío o no se pudo procesar.")
     else:
-        st.info("No se ha cargado ningún archivo.")
+        st.info("📭 Aún no se han cargado datos.")
     
 
 
