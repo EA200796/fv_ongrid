@@ -57,7 +57,7 @@ def main ():
     #######
     with st.popover("Selecciona tus coordenadas"):
         # Carpeta con el archivo raster GHI (.tif)
-        ruta_ghi = 'C:/Users/Dell/Documents/Analisis_Datos/VCode/solar_python/ghi/GHI.tif'
+        ruta_ghi = 'solar_python/ghi/GHI.tif'
 
         ##############
         # --- Inicializar estado ---
@@ -341,7 +341,7 @@ def main ():
         
             ##########
             # Carpeta con los 12 archivos raster mensuales (.tif)
-            ruta_rasters = 'C:/Users/Dell/Documents/Analisis_Datos/VCode/solar_python/monthly_pvout'
+            ruta_rasters = 'solar_python'
             archivos_raster = sorted(glob.glob(os.path.join(ruta_rasters, '*.tif')))
             # Función para extraer valor de un punto en cada raster
             valores_mensuales = []
