@@ -15,6 +15,10 @@ import folium
 from carga_datos import subida_tabla, subida_checkbox, subida_formato
 from datetime import datetime
 import io # para crear buffer en memoria
+from xhtml2pdf import pisa
+import base64
+import plotly.io as pio
+
 
 
 # Configuración inicial
@@ -142,7 +146,7 @@ def main ():
         options= opciones_porcentaje,
         value= 75.0 # valor predeterminado
         )
-    objetivo_cobertura = objetivo_cobertura/100
+    st.session_state['objetivo_cobertura'] = objetivo_cobertura/100
     factor_perdidas = st.sidebar.select_slider(
         "✅ Factor de pérdidas (%):",
         options= opciones_porcentaje,
@@ -320,7 +324,7 @@ def main ():
                 else:
                     clasificacion_variacion = "altamente inestable, alta variación: revisar hábitos."
                 
-                descripcion_variacion = f"\n📈 Variación anual de consumo: ±{consumo_std_kWh:.2f} kWh ({porcentaje_variacion*100:.2f}%) {clasificacion_variacion}"
+                descripcion_variacion = f"\nVariación anual de consumo: ±{consumo_std_kWh:.2f} kWh ({porcentaje_variacion*100:.2f}%) {clasificacion_variacion}"
                 return descripcion_variacion
             #---
             # Descripción del usuario
@@ -368,6 +372,7 @@ def main ():
 
             # Calcular el consumo promedio mensual
             consumo_promedio_kWh = df['Consumo subtotal'].mean()
+            st.session_state['consumo_promedio_kWh']=consumo_promedio_kWh
 
             # Tamaño del sistema necesario
             tamano_sistema_kWp_completo = consumo_promedio_kWh / produccion_por_kWp
@@ -424,8 +429,8 @@ def main ():
                 van = npf.npv(tasa_descuento, flujo_de_caja)
                 flujo_acumulado = np.cumsum(flujo_de_caja)
                 payback_anio = next((i for i, val in enumerate(flujo_acumulado) if val >= 0), "Más de 20 años")
-
-            
+                st.session_state['van']=van
+                st.session_state['tir']=tir            
 
             interpretacion_van = ""
             if tir is not None and not np.isnan(tir) and not np.isinf(tir):
@@ -443,8 +448,7 @@ def main ():
                     interpretacion_tir = f"🔄 Rentabilidad justa - Evaluar con otros criterios."
                 else:
                     interpretacion_tir = f"❌ No rentable - No se recomienda invertir."
-                
-                st.markdown(f"**Payback:** {payback_anio} años")
+                    st.markdown(f"**Payback:** {payback_anio} años")
             
             else:
                 st.error("⚠️ El TIR contiene valores inválidos (NaN o Inf). Revisa los cálculos anteriores.")
@@ -523,7 +527,14 @@ def main ():
                     st.write(f"\n📊 Tasa Interna de Retorno - TIR: {tir*100:.1f}% {interpretacion_tir}")
                 st.write(f"\n💰 Ahorro total neto en {vida_util} años: ${sum(produccion_anual):.2f}")
             
+##############  CONVERSION DE GRAFICOS A PNG
 
+            def convertir_plotly_a_base64(fig):
+                img_bytes = fig.to_image(format="png", width=800, height=400, engine="kaleido")
+                img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+                return img_b64
+
+##########################
             def crear_graficos_interactivos(df):
                 df['Total_pagar']=df['Total_pagar'].fillna(0)
                 df['Monto'] = df['Monto'].fillna(0)
@@ -598,7 +609,7 @@ def main ():
                     margin=dict(t=80, b=30),
                 )
 
-                fig.update_xaxes(title_text="Mes", row=2, col=1, tickangle=45, tickvals=list(range(1,13)), ticktext=[meses_es[i+1] for i in range(12)])
+                fig.update_xaxes(title_text="", row=2, col=1, tickangle=45, tickvals=list(range(1,13)), ticktext=[meses_es[i+1] for i in range(12)])
                 fig.update_yaxes(title_text="Monto ($)", row=1, col=1)
                 fig.update_yaxes(title_text="Consumo (kWh)", row=2, col=1)
 
@@ -606,7 +617,7 @@ def main ():
 
             #################
             # Gráfico de flujo de caja
-            def mostrar_flujo_de_caja(flujo_de_caja, vida_util, tasa_descuento=0.08):
+            def mostrar_flujo_de_caja(flujo_de_caja, vida_util):
                 años = list(range(vida_util + 1))
                 flujo_acumulado = np.cumsum(flujo_de_caja)
 
@@ -614,7 +625,7 @@ def main ():
      
                 beneficio_total = sum(flujo_de_caja[1:])  # omitimos inversión inicial
                 inversion_inicial = -flujo_de_caja[0]
-                b_c_ratio = beneficio_total / inversion_inicial if inversion_inicial != 0 else None
+                #b_c_ratio = beneficio_total / inversion_inicial if inversion_inicial != 0 else None
 
                 # Calcular punto de equilibrio (Payback)
                 flujo_acum = 0
@@ -672,17 +683,15 @@ def main ():
                     height=450
                 )
 
-                # Mostrar gráfico
-                st.plotly_chart(fig, use_container_width=True)
-
-                # Mostrar indicadores financieros clave
-                if van != None:
-                    st.subheader("📊 Indicadores Financieros")
-                    col1, col2, col3, col4 = st.columns(4)
-                    col1.metric("VAN", f"${van:,.2f}")
-                    col2.metric("TIR", f"{tir:.2%}")
-                    col3.metric("Payback", f"Año {payback_anio}" if payback_anio is not None else "No recuperado")
-
+                return fig
+            # Mostrar indicadores financieros clave
+            if van != None:
+                st.subheader("📊 Indicadores Financieros")
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("VAN", f"${van:,.2f}")
+                col2.metric("TIR", f"{tir:.2%}")
+                col3.metric("Payback", f"Año {payback_anio}" if payback_anio is not None else "No recuperado")
+                
             ##################
             def cobertura_solar():
                 # Convertir los valores mensuales a un diccionario: {mes: generación promedio}
@@ -730,24 +739,273 @@ def main ():
                     uniformtext_mode='hide',
                     legend=dict(x=0.5, xanchor='center', orientation='h')
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key="grafico_cobertura_solar")
+                ################### 
+            def cobertura_solar_para_pdf():
+                df = st.session_state.get("df").copy()
+                valores_mensuales = st.session_state.get("valores_mensuales")
+                tamano_sistema_kWp = st.session_state.get("tamano_sistema_kWp")
 
+                # Convertir a diccionario mes → valor
+                generacion_por_mes = {i + 1: val for i, val in enumerate(valores_mensuales)}
+
+                # Agregar columnas al DataFrame
+                df['Generacion estimada (kWh)'] = df['Mes_num'].map(generacion_por_mes) * tamano_sistema_kWp
+                df['Cobertura (%)'] = (df['Generacion estimada (kWh)'] / df['Consumo subtotal']) * 100
+                df['Excedente (kWh)'] = (df['Generacion estimada (kWh)'] - df['Consumo subtotal']).clip(lower=0)
+
+                # Guardar en session_state por si hace falta
+                st.session_state["df"] = df
+
+                # Crear gráfico
+                fig = go.Figure()
+
+                fig.add_trace(go.Bar(
+                    x=df['Mes'],
+                    y=df['Cobertura (%)'],
+                    name='Cobertura mensual (%)',
+                    marker_color='green',
+                    text=df['Cobertura (%)'].round(1).astype(str) + '%',
+                    textposition='outside',
+                ))
+
+                fig.add_trace(go.Bar(
+                    x=df['Mes'],
+                    y=df['Excedente (kWh)'],
+                    name='Excedente mensual (kWh)',
+                    marker_color='rgba(255, 100, 100, 0.7)',
+                    text=df['Excedente (kWh)'].round(1),
+                    textposition='outside',
+                ))
+
+                fig.update_layout(
+                    title='☀️ Cobertura solar y excedente mensual',
+                    xaxis_title='',
+                    yaxis_title='Porcentaje (%) / Energía (kWh)',
+                    barmode='group',
+                    bargap=0.2,
+                    height=400,
+                    margin=dict(t=40, b=40),
+                    legend=dict(x=0.5, xanchor='center', orientation='h')
+                )
+
+                return fig
+
+
+############### OBTENER GRAFICOS PNG
+            # Obtener y convertir los gráficos
+            fig1 = crear_graficos_interactivos(st.session_state["df"])
+            fig2 = mostrar_flujo_de_caja(flujo_de_caja, vida_util)
+            fig3 = cobertura_solar_para_pdf()
+
+            grafico_consumo_b64 = convertir_plotly_a_base64(fig1)
+            grafico_flujo_b64 = convertir_plotly_a_base64(fig2)
+            grafico_cobertura_b64 = convertir_plotly_a_base64(fig3)
 
             ###############
+            def interpretacion_tecnica():
+                cobertura = int(st.session_state.get("objetivo_cobertura", 0) * 100)
+                tamano = st.session_state.get("tamano_sistema_kWp", 0)
+                consumo = st.session_state.get("consumo_promedio_kWh", 0)
+                ahorro = st.session_state.get("tarifa_promedio_usd_kWh", 0) * consumo * 12
+                tir = st.session_state.get("tir", None)
+                van = st.session_state.get("van", None)
+
+                df = st.session_state.get("df")
+                excedente = 0
+                if df is not None and "Excedente (kWh)" in df.columns:
+                    excedente = df["Excedente (kWh)"].mean()
+
+                frases = []
+
+                # 1. Cobertura del sistema
+                if cobertura >= 90:
+                    frases.append(f"El sistema propuesto está diseñado para cubrir casi la totalidad del consumo eléctrico anual ({cobertura}%), brindando alta independencia energética.")
+                elif cobertura >= 50:
+                    frases.append(f"El sistema cubrirá aproximadamente el {cobertura}% del consumo eléctrico, lo que permite una reducción significativa en la factura de electricidad.")
+                else:
+                    frases.append(f"Se ha dimensionado un sistema que cubre el {cobertura}% del consumo, ideal para usuarios que buscan reducir costos sin realizar una inversión total.")
+
+                # 2. Tamaño del sistema
+                if tamano <= 2:
+                    frases.append("La potencia del sistema es baja, lo cual lo hace económicamente accesible y adecuado para residencias pequeñas o con espacio limitado.")
+                elif tamano <= 5:
+                    frases.append("El sistema tiene un tamaño intermedio, adecuado para hogares de consumo medio o familias de 3 a 5 personas.")
+                else:
+                    frases.append("Se requiere un sistema de mayor capacidad, lo que sugiere un consumo elevado o la posibilidad de ampliar la infraestructura.")
+
+                # 3. Ahorro estimado
+                if ahorro >= 300:
+                    frases.append(f"Se estima un ahorro anual de aproximadamente ${ahorro:.2f}, lo cual contribuye significativamente a la economía familiar a mediano plazo.")
+                else:
+                    frases.append(f"El ahorro anual estimado es de unos ${ahorro:.2f}, útil para reducir gastos, aunque el retorno de inversión puede ser moderado.")
+
+                # 4. Recomendación de tipo de conexión
+                if cobertura < 50:
+                    tipo_conexion = "Autoconsumo simple (inyección cero)"
+                elif cobertura >= 50 and excedente < 20:
+                    tipo_conexion = "Net Billing (facturación neta con baja inyección)"
+                elif excedente >= 20:
+                    tipo_conexion = "Net Metering (compensación total con saldo energético)"
+                else:
+                    tipo_conexion = "Autoconsumo parcial con mínima inyección"
+                frases.append(f"Recomendación técnica: se sugiere optar por <strong>{tipo_conexion}</strong> considerando el perfil de consumo y excedente estimado.")            
+                # 5. Evaluación financiera (TIR y VAN)
+                if tir is not None and van is not None:
+                    tir_pct = tir * 100
+                    if tir > 0.08 and van > 0:
+                        frases.append(f"El proyecto es <strong>financieramente viable</strong>, con un TIR del {tir_pct:.1f}% y un VAN positivo de ${van:,.2f}.")
+                    elif tir > 0.05:
+                        frases.append(f"La rentabilidad es <strong>moderada</strong> (TIR: {tir_pct:.1f}%, VAN: ${van:,.2f}), puede mejorar con incentivos o ajustes.")
+                    else:
+                        frases.append(f"<strong>No se recomienda la inversión</strong> bajo condiciones actuales (TIR: {tir_pct:.1f}%, VAN: ${van:,.2f}).")
+
+                # Unir y devolver
+                return " ".join(frases)
+######
+            def glosario_conexion_solar(interpretacion_texto):
+                glosario = ""
+
+                definiciones = {
+                    "Autoconsumo simple": "🔌 <strong>Autoconsumo simple (inyección cero):</strong> Usas directamente la energía solar que produces, pero no inyectas nada a la red eléctrica. Ideal para reducir la factura sin acuerdos adicionales.",
+                    "Net Billing": "<strong>Net Billing (facturación neta):</strong> La energía solar que no consumes se inyecta a la red, y la empresa eléctrica te descuenta un valor en tu factura. Te pagan por lo que aportas, aunque a menor tarifa.",
+                    "Net Metering": "<strong>Net Metering (medición neta):</strong> Permite guardar el excedente como un 'saldo de energía' para usarlo después. Muy justo, pero requiere acuerdos y medidor especial.",
+                    "Autoconsumo parcial con mínima inyección": "<strong>Autoconsumo parcial con mínima inyección:</strong> Tu sistema cubre parte del consumo y genera muy poco excedente. Útil si tienes poco espacio o deseas una solución balanceada."
+                }
+
+                # Verificar qué términos aparecen en la interpretación
+                for clave, definicion in definiciones.items():
+                    if clave in interpretacion_texto:
+                        glosario += f"<p>{definicion}</p>\n"
+
+                return glosario
+
+##############
+            
+            variacion = variacion()
+            st.session_state['variacion'] = variacion
+            def generar_reporte_pdf_con_xhtml2pdf():
+                df = st.session_state.get("df")
+                valores_mensuales = st.session_state.get("valores_mensuales", [])
+                tamano_sistema_kWp = st.session_state.get("tamano_sistema_kWp", 0)
+                tarifa_promedio = st.session_state.get("tarifa_promedio_usd_kWh", 0)
+                produccion_total = tamano_sistema_kWp * sum(valores_mensuales)
+                consumo_promedio = st.session_state.get("consumo_promedio_kWh", 0)
+                ahorro_anual = tarifa_promedio * consumo_promedio * 12
+
+                lat = st.session_state.get("lat")
+                lon = st.session_state.get("lon")
+                interpretacion = interpretacion_tecnica()
+                glosario = glosario_conexion_solar(interpretacion)
+                variacion = st.session_state.get("variacion")
+
+                html = f"""
+                <html>
+                <head>
+                    <style>
+                        body {{
+                            font-family: Arial, sans-serif;
+                            font-size: 12px;
+                            padding: 10px;
+                        }}
+                        h1 {{
+                            color: #003366;
+                        }}
+                        table {{
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-top: 15px;
+                        }}
+                        th, td {{
+                            border: 1px solid #ccc;
+                            padding: 8px;
+                            text-align: left;
+                        }}
+                        th {{
+                            background-color: #f2f2f2;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    <h1>Reporte Técnico - Sistema Fotovoltaico On-Grid</h1>
+
+                    <h4>Periodo de análisis: {cant_meses} meses ({año_min}-{año_max})</h4>
+                    <p>Consumo mensual promedio: {consumo_promedio_kWh:.2f} kWh, con un mínimo de {consumo_min_kWh:.2f} kWh y un máximo de {consumo_max_kWh:.2f} kWh.<br>
+                    {variacion}</p>
+                    <h2>Ubicación</h2>
+                    <p><strong>Latitud:</strong> {lat}<br>
+                    <strong>Longitud:</strong> {lon}<br>
+                    Radiación solar diaria media: {radiacion_diaria:.2f} kWh/m²/día)</p>
+
+                    <h2>Datos de Entrada</h2>
+                    <ul>
+                        <li>Consumo mensual promedio: <strong>{consumo_promedio:.2f} kWh</strong></li>
+                        <li>Tarifa promedio (incl. impuestos): <strong>${tarifa_promedio:.3f}/kWh</strong></li>
+                        <li>Objetivo de cobertura: <strong>{int(st.session_state.get('objetivo_cobertura', 0)*100)}%</strong></li>
+                    </ul>
+                    
+                    <h2>Análisis de Consumo Eléctrico Mensual</h2>
+                    <img src="data:image/png;base64,{grafico_consumo_b64}" width="700"/>
+
+                    <h2>Dimensionamiento</h2>
+                    <ul>
+                        <li>Tamaño del sistema: <strong>{tamano_sistema_kWp:.2f} kWp</strong></li>
+                        <li>Producción mensual estimada: <strong>{produccion_total:.2f} kWh</strong></li>
+                        <li>Ahorro anual estimado: <strong>${ahorro_anual:.2f}</strong></li>
+                    </ul>
+                    <h2>Flujo de Caja del Proyecto</h2>
+                    <img src="data:image/png;base64,{grafico_flujo_b64}" width="700"/>
+
+                    <h2>Interpretación Técnica</h2>
+                    <img src="data:image/png;base64,{grafico_cobertura_b64}" width="700"/>
+                    <p>{interpretacion}</p>
+                    
+                    <h2>Glosario</h2>
+                    {glosario}
+
+                    <p style="margin-top: 30px;">Generado automáticamente por la app <strong>Solar OnGrid</strong> - Alejandro H.</p>
+                </body>
+                </html>
+                """
+
+                # Convertir HTML a PDF en memoria
+                result_pdf = io.BytesIO()
+                pisa_status = pisa.CreatePDF(io.StringIO(html), dest=result_pdf)
+
+                if not pisa_status.err:
+                    result_pdf.seek(0)
+                    b64_pdf = base64.b64encode(result_pdf.read()).decode("utf-8")
+                    href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="reporte_solar.pdf">📄 Descargar reporte PDF</a>'
+                    st.markdown(href, unsafe_allow_html=True)
+                else:
+                    st.error("❌ Error al generar el PDF.")
+
+
+            ################
             
             with right:
                 # Mostrar gráfico
                 right.markdown("## 📊 Análisis de Consumo Eléctrico Mensual")
                 with st.container():
-                    fig1 = crear_graficos_interactivos(df)
-                    st.plotly_chart(fig1, use_container_width=True)
+                    fig_consumo_energia = crear_graficos_interactivos(df)
+                    st.plotly_chart(fig_consumo_energia, use_container_width=True, key="grafico_consumo_mensual")
 
             st.title('📈 Proyección a futuro')
             with st.container(border=True):
                 # Mostrar el gráfico
-                mostrar_flujo_de_caja(flujo_de_caja, vida_util)
+                fig_flujo_caja=mostrar_flujo_de_caja(flujo_de_caja, vida_util)
+                # Mostrar gráfico
+                st.plotly_chart(fig_flujo_caja, use_container_width=True, key="grafico_flujo_caja_proyecto")
+
             with st.container(border=True):    
                 cobertura_solar()
+
+            with st.container(border=True):
+                st.subheader("📄 Generar Reporte en PDF")
+                if st.button("✅ Crear reporte técnico PDF"):
+                    generar_reporte_pdf_con_xhtml2pdf()
+
+            
         else:
             st.warning("⚠️ El archivo está vacío o no se pudo procesar.")
     else:
