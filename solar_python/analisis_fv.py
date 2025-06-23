@@ -533,13 +533,6 @@ def main ():
                     st.write(f"\n📊 Tasa Interna de Retorno - TIR: {tir*100:.1f}% {interpretacion_tir}")
                 st.write(f"\n💰 Ahorro total neto en {vida_util} años: ${sum(produccion_anual):.2f}")
             
-##############  CONVERSION DE GRAFICOS A PNG
-
-            def convertir_plotly_a_base64(fig):
-                img_bytes = fig.to_image(format="png", width=800, height=400, engine="kaleido")
-                img_b64 = base64.b64encode(img_bytes).decode("utf-8")
-                return img_b64
-
 ##########################
             def crear_graficos_interactivos(df):
                 df['Total_pagar']=df['Total_pagar'].fillna(0)
@@ -798,16 +791,6 @@ def main ():
                 return fig
 
 
-############### OBTENER GRAFICOS PNG
-            # Obtener y convertir los gráficos
-            fig1 = crear_graficos_interactivos(st.session_state["df"])
-            fig2 = mostrar_flujo_de_caja(flujo_de_caja, vida_util)
-            fig3 = cobertura_solar_para_pdf()
-
-            grafico_consumo_b64 = convertir_plotly_a_base64(fig1)
-            grafico_flujo_b64 = convertir_plotly_a_base64(fig2)
-            grafico_cobertura_b64 = convertir_plotly_a_base64(fig3)
-
             ###############
             def interpretacion_tecnica():
                 cobertura = int(st.session_state.get("objetivo_cobertura", 0) * 100)
@@ -948,49 +931,14 @@ def main ():
                 story.append(Paragraph(f"• Objetivo de cobertura: <b>{int(st.session_state.get('objetivo_cobertura', 0)*100)}%</b>", styles['Normal']))
                 story.append(Spacer(1, 12))
                 
-                # Función para convertir base64 a imagen temporal
-                def base64_to_temp_image(base64_string):
-                    
-                    # Decodificar base64
-                    image_data = base64.b64decode(base64_string)
-                    
-                    # Crear archivo temporal
-                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-                    temp_file.write(image_data)
-                    temp_file.close()
-                    
-                    return temp_file.name
-                
-                # Agregar gráficos
-                try:
-                    # Gráfico de consumo
-                    story.append(Paragraph("<b>Análisis de Consumo Eléctrico Mensual</b>", styles['Heading2']))
-                    temp_img1 = base64_to_temp_image(grafico_consumo_b64)
-                    img1 = Image(temp_img1, width=6*inch, height=3*inch)
-                    story.append(img1)
-                    story.append(Spacer(1, 12))
-                    
+                                    
                     # Dimensionamiento
                     story.append(Paragraph("<b>Dimensionamiento</b>", styles['Heading2']))
                     story.append(Paragraph(f"• Tamaño del sistema: <b>{tamano_sistema_kWp:.2f} kWp</b>", styles['Normal']))
                     story.append(Paragraph(f"• Producción mensual estimada: <b>{produccion_total:.2f} kWh</b>", styles['Normal']))
                     story.append(Paragraph(f"• Ahorro anual estimado: <b>${ahorro_anual:.2f}</b>", styles['Normal']))
                     story.append(Spacer(1, 12))
-                    
-                    # Gráfico de flujo de caja
-                    story.append(Paragraph("<b>Flujo de Caja del Proyecto</b>", styles['Heading2']))
-                    temp_img2 = base64_to_temp_image(grafico_flujo_b64)
-                    img2 = Image(temp_img2, width=6*inch, height=3*inch)
-                    story.append(img2)
-                    story.append(Spacer(1, 12))
-                    
-                    # Gráfico de cobertura
-                    story.append(Paragraph("<b>Cobertura Solar</b>", styles['Heading2']))
-                    temp_img3 = base64_to_temp_image(grafico_cobertura_b64)
-                    img3 = Image(temp_img3, width=6*inch, height=3*inch)
-                    story.append(img3)
-                    story.append(Spacer(1, 12))
-                    
+                                      
                     # Interpretación
                     story.append(Paragraph("<b>Interpretación Técnica</b>", styles['Heading2']))
                     story.append(Paragraph(interpretacion, styles['Normal']))
@@ -1007,11 +955,7 @@ def main ():
                     # Construir PDF
                     doc.build(story)
                     
-                    # Limpiar archivos temporales
-                    os.unlink(temp_img1)
-                    os.unlink(temp_img2)
-                    os.unlink(temp_img3)
-                    
+
                     # Crear enlace de descarga
                     buffer.seek(0)
                     b64_pdf = base64.b64encode(buffer.read()).decode("utf-8")
@@ -1020,13 +964,6 @@ def main ():
                     
                 except Exception as e:
                     st.error(f"❌ Error al generar el PDF: {e}")
-                    # Limpiar archivos temporales en caso de error
-                    try:
-                        os.unlink(temp_img1)
-                        os.unlink(temp_img2)
-                        os.unlink(temp_img3)
-                    except:
-                        pass
 
             ################
             
