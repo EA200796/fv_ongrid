@@ -529,10 +529,10 @@ def main ():
             
 ##############  CONVERSION DE GRAFICOS A PNG
 
-            def convertir_plotly_a_base64(fig):
-                img_bytes = fig.to_image(format="png", width=800, height=400, engine="kaleido")
-                img_b64 = base64.b64encode(img_bytes).decode("utf-8")
-                return img_b64
+            #def convertir_plotly_a_base64(fig):
+            #    img_bytes = fig.to_image(format="png", width=800, height=400, engine="kaleido")
+            #    img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+            #    return img_b64
 
 ##########################
             def crear_graficos_interactivos(df):
@@ -798,9 +798,10 @@ def main ():
             fig2 = mostrar_flujo_de_caja(flujo_de_caja, vida_util)
             fig3 = cobertura_solar_para_pdf()
 
-            grafico_consumo_b64 = convertir_plotly_a_base64(fig1)
-            grafico_flujo_b64 = convertir_plotly_a_base64(fig2)
-            grafico_cobertura_b64 = convertir_plotly_a_base64(fig3)
+            grafico_consumo_b64 = fig1.to_html(full_html=False, include_plotlyjs='cdn')
+            grafico_flujo_b64 = fig2.to_html(full_html=False, include_plotlyjs='cdn')
+            grafico_cobertura_b64 = fig3.to_html(full_html=False, include_plotlyjs='cdn')
+
 
             ###############
             def interpretacion_tecnica():
