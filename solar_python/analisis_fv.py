@@ -15,9 +15,15 @@ import folium
 from carga_datos import subida_tabla, subida_checkbox, subida_formato
 from datetime import datetime
 import io # para crear buffer en memoria
-from xhtml2pdf import pisa
 import base64
 import plotly.io as pio
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+import tempfile
+import os
 
 
 
@@ -61,7 +67,7 @@ def main ():
     #######
     with st.popover("Selecciona tus coordenadas"):
         # Carpeta con el archivo raster GHI (.tif)
-        ruta_ghi = 'solar_python/ghi/GHI.tif'
+        ruta_ghi = 'C:/Users/Dell/Documents/Analisis_Datos/VCode/solar_python/ghi/GHI.tif'
 
         ##############
         # --- Inicializar estado ---
@@ -345,7 +351,7 @@ def main ():
         
             ##########
             # Carpeta con los 12 archivos raster mensuales (.tif)
-            ruta_rasters = 'solar_python/monthly_pvout'
+            ruta_rasters = 'C:/Users/Dell/Documents/Analisis_Datos/VCode/solar_python/monthly_pvout'
             archivos_raster = sorted(glob.glob(os.path.join(ruta_rasters, '*.tif')))
             # Función para extraer valor de un punto en cada raster
             valores_mensuales = []
@@ -529,10 +535,10 @@ def main ():
             
 ##############  CONVERSION DE GRAFICOS A PNG
 
-            #def convertir_plotly_a_base64(fig):
-            #    img_bytes = fig.to_image(format="png", width=800, height=400, engine="kaleido")
-            #    img_b64 = base64.b64encode(img_bytes).decode("utf-8")
-            #    return img_b64
+            def convertir_plotly_a_base64(fig):
+                img_bytes = fig.to_image(format="png", width=800, height=400, engine="kaleido")
+                img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+                return img_b64
 
 ##########################
             def crear_graficos_interactivos(df):
@@ -798,10 +804,9 @@ def main ():
             fig2 = mostrar_flujo_de_caja(flujo_de_caja, vida_util)
             fig3 = cobertura_solar_para_pdf()
 
-            grafico_consumo_b64 = fig1.to_html(full_html=False, include_plotlyjs='cdn')
-            grafico_flujo_b64 = fig2.to_html(full_html=False, include_plotlyjs=False)
-            grafico_cobertura_b64 = fig3.to_html(full_html=False, include_plotlyjs=False)
-
+            grafico_consumo_b64 = convertir_plotly_a_base64(fig1)
+            grafico_flujo_b64 = convertir_plotly_a_base64(fig2)
+            grafico_cobertura_b64 = convertir_plotly_a_base64(fig3)
 
             ###############
             def interpretacion_tecnica():
@@ -885,7 +890,9 @@ def main ():
             
             variacion = variacion()
             st.session_state['variacion'] = variacion
-            def generar_reporte_pdf_con_xhtml2pdf():
+            
+
+            def generar_reporte_pdf_con_reportlab():
                 df = st.session_state.get("df")
                 valores_mensuales = st.session_state.get("valores_mensuales", [])
                 tamano_sistema_kWp = st.session_state.get("tamano_sistema_kWp", 0)
@@ -900,87 +907,126 @@ def main ():
                 glosario = glosario_conexion_solar(interpretacion)
                 variacion = st.session_state.get("variacion")
 
-                html = f"""
-                <html>
-                <head>
-                    <style>
-                        body {{
-                            font-family: Arial, sans-serif;
-                            font-size: 12px;
-                            padding: 10px;
-                        }}
-                        h1 {{
-                            color: #003366;
-                        }}
-                        table {{
-                            width: 100%;
-                            border-collapse: collapse;
-                            margin-top: 15px;
-                        }}
-                        th, td {{
-                            border: 1px solid #ccc;
-                            padding: 8px;
-                            text-align: left;
-                        }}
-                        th {{
-                            background-color: #f2f2f2;
-                        }}
-                    </style>
-                </head>
-                <body>
-                    <h1>Reporte Técnico - Sistema Fotovoltaico On-Grid</h1>
-
-                    <h4>Periodo de análisis: {cant_meses} meses ({año_min}-{año_max})</h4>
-                    <p>Consumo mensual promedio: {consumo_promedio_kWh:.2f} kWh, con un mínimo de {consumo_min_kWh:.2f} kWh y un máximo de {consumo_max_kWh:.2f} kWh.<br>
-                    {variacion}</p>
-                    <h2>Ubicación</h2>
-                    <p><strong>Latitud:</strong> {lat}<br>
-                    <strong>Longitud:</strong> {lon}<br>
-                    Radiación solar diaria media: {radiacion_diaria:.2f} kWh/m²/día)</p>
-
-                    <h2>Datos de Entrada</h2>
-                    <ul>
-                        <li>Consumo mensual promedio: <strong>{consumo_promedio:.2f} kWh</strong></li>
-                        <li>Tarifa promedio (incl. impuestos): <strong>${tarifa_promedio:.3f}/kWh</strong></li>
-                        <li>Objetivo de cobertura: <strong>{int(st.session_state.get('objetivo_cobertura', 0)*100)}%</strong></li>
-                    </ul>
+                # Crear buffer para PDF
+                buffer = io.BytesIO()
+                
+                # Crear documento PDF
+                doc = SimpleDocTemplate(buffer, pagesize=A4)
+                story = []
+                
+                # Estilos
+                styles = getSampleStyleSheet()
+                title_style = ParagraphStyle(
+                    'CustomTitle',
+                    parent=styles['Heading1'],
+                    fontSize=18,
+                    spaceAfter=30,
+                    textColor=colors.HexColor('#003366')
+                )
+                
+                # Título
+                story.append(Paragraph("Reporte Técnico - Sistema Fotovoltaico On-Grid", title_style))
+                story.append(Spacer(1, 12))
+                
+                # Información básica
+                story.append(Paragraph(f"<b>Periodo de análisis:</b> {cant_meses} meses ({año_min}-{año_max})", styles['Normal']))
+                story.append(Paragraph(f"Consumo mensual promedio: {consumo_promedio_kWh:.2f} kWh", styles['Normal']))
+                story.append(Paragraph(variacion, styles['Normal']))
+                story.append(Spacer(1, 12))
+                
+                # Ubicación
+                story.append(Paragraph("<b>Ubicación</b>", styles['Heading2']))
+                story.append(Paragraph(f"Latitud: {lat}", styles['Normal']))
+                story.append(Paragraph(f"Longitud: {lon}", styles['Normal']))
+                story.append(Paragraph(f"Radiación solar diaria media: {radiacion_diaria:.2f} kWh/m²/día", styles['Normal']))
+                story.append(Spacer(1, 12))
+                
+                # Datos de entrada
+                story.append(Paragraph("<b>Datos de Entrada</b>", styles['Heading2']))
+                story.append(Paragraph(f"• Consumo mensual promedio: <b>{consumo_promedio:.2f} kWh</b>", styles['Normal']))
+                story.append(Paragraph(f"• Tarifa promedio (incl. impuestos): <b>${tarifa_promedio:.3f}/kWh</b>", styles['Normal']))
+                story.append(Paragraph(f"• Objetivo de cobertura: <b>{int(st.session_state.get('objetivo_cobertura', 0)*100)}%</b>", styles['Normal']))
+                story.append(Spacer(1, 12))
+                
+                # Función para convertir base64 a imagen temporal
+                def base64_to_temp_image(base64_string):
                     
-                    <h2>Análisis de Consumo Eléctrico Mensual</h2>
-                    <img src="data:image/png;base64,{grafico_consumo_b64}" alt="Gráfico de Consumo"/>
-
-                    <h2>Dimensionamiento</h2>
-                    <ul>
-                        <li>Tamaño del sistema: <strong>{tamano_sistema_kWp:.2f} kWp</strong></li>
-                        <li>Producción mensual estimada: <strong>{produccion_total:.2f} kWh</strong></li>
-                        <li>Ahorro anual estimado: <strong>${ahorro_anual:.2f}</strong></li>
-                    </ul>
-                    <h2>Flujo de Caja del Proyecto</h2>
-                    <img src="data:image/png;base64,{grafico_flujo_b64}" alt="Gráfico de Flujo de Caja"/>
-
-                    <h2>Interpretación Técnica</h2>
-                    <img src="data:image/png;base64,{grafico_cobertura_b64}" alt="Gráfico de Cobertura"/>
-                    <p>{interpretacion}</p>
+                    # Decodificar base64
+                    image_data = base64.b64decode(base64_string)
                     
-                    <h2>Glosario</h2>
-                    {glosario}
-
-                    <p style="margin-top: 30px;">Generado automáticamente por la app <strong>Solar OnGrid</strong> - Alejandro H.</p>
-                </body>
-                </html>
-                """
-
-                # Convertir HTML a PDF en memoria
-                result_pdf = io.BytesIO()
-                pisa_status = pisa.CreatePDF(io.StringIO(html), dest=result_pdf)
-
-                if not pisa_status.err:
-                    result_pdf.seek(0)
-                    b64_pdf = base64.b64encode(result_pdf.read()).decode("utf-8")
+                    # Crear archivo temporal
+                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+                    temp_file.write(image_data)
+                    temp_file.close()
+                    
+                    return temp_file.name
+                
+                # Agregar gráficos
+                try:
+                    # Gráfico de consumo
+                    story.append(Paragraph("<b>Análisis de Consumo Eléctrico Mensual</b>", styles['Heading2']))
+                    temp_img1 = base64_to_temp_image(grafico_consumo_b64)
+                    img1 = Image(temp_img1, width=6*inch, height=3*inch)
+                    story.append(img1)
+                    story.append(Spacer(1, 12))
+                    
+                    # Dimensionamiento
+                    story.append(Paragraph("<b>Dimensionamiento</b>", styles['Heading2']))
+                    story.append(Paragraph(f"• Tamaño del sistema: <b>{tamano_sistema_kWp:.2f} kWp</b>", styles['Normal']))
+                    story.append(Paragraph(f"• Producción mensual estimada: <b>{produccion_total:.2f} kWh</b>", styles['Normal']))
+                    story.append(Paragraph(f"• Ahorro anual estimado: <b>${ahorro_anual:.2f}</b>", styles['Normal']))
+                    story.append(Spacer(1, 12))
+                    
+                    # Gráfico de flujo de caja
+                    story.append(Paragraph("<b>Flujo de Caja del Proyecto</b>", styles['Heading2']))
+                    temp_img2 = base64_to_temp_image(grafico_flujo_b64)
+                    img2 = Image(temp_img2, width=6*inch, height=3*inch)
+                    story.append(img2)
+                    story.append(Spacer(1, 12))
+                    
+                    # Gráfico de cobertura
+                    story.append(Paragraph("<b>Cobertura Solar</b>", styles['Heading2']))
+                    temp_img3 = base64_to_temp_image(grafico_cobertura_b64)
+                    img3 = Image(temp_img3, width=6*inch, height=3*inch)
+                    story.append(img3)
+                    story.append(Spacer(1, 12))
+                    
+                    # Interpretación
+                    story.append(Paragraph("<b>Interpretación Técnica</b>", styles['Heading2']))
+                    story.append(Paragraph(interpretacion, styles['Normal']))
+                    story.append(Spacer(1, 12))
+                    
+                    # Glosario
+                    story.append(Paragraph("<b>Glosario</b>", styles['Heading2']))
+                    story.append(Paragraph(glosario, styles['Normal']))
+                    story.append(Spacer(1, 12))
+                    
+                    # Pie de página
+                    story.append(Paragraph("Generado automáticamente por la app <b>Solar OnGrid</b> - Alejandro H.", styles['Normal']))
+                    
+                    # Construir PDF
+                    doc.build(story)
+                    
+                    # Limpiar archivos temporales
+                    os.unlink(temp_img1)
+                    os.unlink(temp_img2)
+                    os.unlink(temp_img3)
+                    
+                    # Crear enlace de descarga
+                    buffer.seek(0)
+                    b64_pdf = base64.b64encode(buffer.read()).decode("utf-8")
                     href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="reporte_solar.pdf">📄 Descargar reporte PDF</a>'
                     st.markdown(href, unsafe_allow_html=True)
-                else:
-                    st.error("❌ Error al generar el PDF.")
-
+                    
+                except Exception as e:
+                    st.error(f"❌ Error al generar el PDF: {e}")
+                    # Limpiar archivos temporales en caso de error
+                    try:
+                        os.unlink(temp_img1)
+                        os.unlink(temp_img2)
+                        os.unlink(temp_img3)
+                    except:
+                        pass
 
             ################
             
@@ -1004,7 +1050,7 @@ def main ():
             with st.container(border=True):
                 st.subheader("📄 Generar Reporte en PDF")
                 if st.button("✅ Crear reporte técnico PDF"):
-                    generar_reporte_pdf_con_xhtml2pdf()
+                    generar_reporte_pdf_con_reportlab()
 
             
         else:
