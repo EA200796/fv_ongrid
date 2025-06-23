@@ -876,92 +876,93 @@ def main ():
             
 
             def generar_reporte_pdf_con_reportlab():
-                df = st.session_state.get("df")
-                valores_mensuales = st.session_state.get("valores_mensuales", [])
-                tamano_sistema_kWp = st.session_state.get("tamano_sistema_kWp", 0)
-                tarifa_promedio = st.session_state.get("tarifa_promedio_usd_kWh", 0)
-                produccion_total = tamano_sistema_kWp * sum(valores_mensuales)
-                consumo_promedio = st.session_state.get("consumo_promedio_kWh", 0)
-                ahorro_anual = tarifa_promedio * consumo_promedio * 12
-
-                lat = st.session_state.get("lat")
-                lon = st.session_state.get("lon")
-                interpretacion = interpretacion_tecnica()
-                glosario = glosario_conexion_solar(interpretacion)
-                variacion = st.session_state.get("variacion")
-
-                # Crear buffer para PDF
-                buffer = io.BytesIO()
-                
-                # Crear documento PDF
-                doc = SimpleDocTemplate(buffer, pagesize=A4)
-                story = []
-                
-                # Estilos
-                styles = getSampleStyleSheet()
-                title_style = ParagraphStyle(
-                    'CustomTitle',
-                    parent=styles['Heading1'],
-                    fontSize=18,
-                    spaceAfter=30,
-                    textColor=colors.HexColor('#003366')
-                )
-                
-                # Título
-                story.append(Paragraph("Reporte Técnico - Sistema Fotovoltaico On-Grid", title_style))
-                story.append(Spacer(1, 12))
-                
-                # Información básica
-                story.append(Paragraph(f"<b>Periodo de análisis:</b> {cant_meses} meses ({año_min}-{año_max})", styles['Normal']))
-                story.append(Paragraph(f"Consumo mensual promedio: {consumo_promedio_kWh:.2f} kWh", styles['Normal']))
-                story.append(Paragraph(variacion, styles['Normal']))
-                story.append(Spacer(1, 12))
-                
-                # Ubicación
-                story.append(Paragraph("<b>Ubicación</b>", styles['Heading2']))
-                story.append(Paragraph(f"Latitud: {lat}", styles['Normal']))
-                story.append(Paragraph(f"Longitud: {lon}", styles['Normal']))
-                story.append(Paragraph(f"Radiación solar diaria media: {radiacion_diaria:.2f} kWh/m²/día", styles['Normal']))
-                story.append(Spacer(1, 12))
-                
-                # Datos de entrada
-                story.append(Paragraph("<b>Datos de Entrada</b>", styles['Heading2']))
-                story.append(Paragraph(f"• Consumo mensual promedio: <b>{consumo_promedio:.2f} kWh</b>", styles['Normal']))
-                story.append(Paragraph(f"• Tarifa promedio (incl. impuestos): <b>${tarifa_promedio:.3f}/kWh</b>", styles['Normal']))
-                story.append(Paragraph(f"• Objetivo de cobertura: <b>{int(st.session_state.get('objetivo_cobertura', 0)*100)}%</b>", styles['Normal']))
-                story.append(Spacer(1, 12))
-                
-                                    
-                # Dimensionamiento
-                story.append(Paragraph("<b>Dimensionamiento</b>", styles['Heading2']))
-                story.append(Paragraph(f"• Tamaño del sistema: <b>{tamano_sistema_kWp:.2f} kWp</b>", styles['Normal']))
-                story.append(Paragraph(f"• Producción mensual estimada: <b>{produccion_total:.2f} kWh</b>", styles['Normal']))
-                story.append(Paragraph(f"• Ahorro anual estimado: <b>${ahorro_anual:.2f}</b>", styles['Normal']))
-                story.append(Spacer(1, 12))
-                                      
-                # Interpretación
-                story.append(Paragraph("<b>Interpretación Técnica</b>", styles['Heading2']))
-                story.append(Paragraph(interpretacion, styles['Normal']))
-                story.append(Spacer(1, 12))
+                try:
+                    df = st.session_state.get("df")
+                    valores_mensuales = st.session_state.get("valores_mensuales", [])
+                    tamano_sistema_kWp = st.session_state.get("tamano_sistema_kWp", 0)
+                    tarifa_promedio = st.session_state.get("tarifa_promedio_usd_kWh", 0)
+                    produccion_total = tamano_sistema_kWp * sum(valores_mensuales)
+                    consumo_promedio = st.session_state.get("consumo_promedio_kWh", 0)
+                    ahorro_anual = tarifa_promedio * consumo_promedio * 12
+    
+                    lat = st.session_state.get("lat")
+                    lon = st.session_state.get("lon")
+                    interpretacion = interpretacion_tecnica()
+                    glosario = glosario_conexion_solar(interpretacion)
+                    variacion = st.session_state.get("variacion")
+    
+                    # Crear buffer para PDF
+                    buffer = io.BytesIO()
                     
-                # Glosario
-                story.append(Paragraph("<b>Glosario</b>", styles['Heading2']))
-                story.append(Paragraph(glosario, styles['Normal']))
-                story.append(Spacer(1, 12))
+                    # Crear documento PDF
+                    doc = SimpleDocTemplate(buffer, pagesize=A4)
+                    story = []
                     
-                # Pie de página
-                story.append(Paragraph("Generado automáticamente por la app <b>Solar OnGrid</b> - Alejandro H.", styles['Normal']))
+                    # Estilos
+                    styles = getSampleStyleSheet()
+                    title_style = ParagraphStyle(
+                        'CustomTitle',
+                        parent=styles['Heading1'],
+                        fontSize=18,
+                        spaceAfter=30,
+                        textColor=colors.HexColor('#003366')
+                    )
                     
-                # Construir PDF
-                doc.build(story)
+                    # Título
+                    story.append(Paragraph("Reporte Técnico - Sistema Fotovoltaico On-Grid", title_style))
+                    story.append(Spacer(1, 12))
                     
-
-                # Crear enlace de descarga
-                buffer.seek(0)
-                b64_pdf = base64.b64encode(buffer.read()).decode("utf-8")
-                href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="reporte_solar.pdf">📄 Descargar reporte PDF</a>'
-                st.markdown(href, unsafe_allow_html=True)
+                    # Información básica
+                    story.append(Paragraph(f"<b>Periodo de análisis:</b> {cant_meses} meses ({año_min}-{año_max})", styles['Normal']))
+                    story.append(Paragraph(f"Consumo mensual promedio: {consumo_promedio_kWh:.2f} kWh", styles['Normal']))
+                    story.append(Paragraph(variacion, styles['Normal']))
+                    story.append(Spacer(1, 12))
                     
+                    # Ubicación
+                    story.append(Paragraph("<b>Ubicación</b>", styles['Heading2']))
+                    story.append(Paragraph(f"Latitud: {lat}", styles['Normal']))
+                    story.append(Paragraph(f"Longitud: {lon}", styles['Normal']))
+                    story.append(Paragraph(f"Radiación solar diaria media: {radiacion_diaria:.2f} kWh/m²/día", styles['Normal']))
+                    story.append(Spacer(1, 12))
+                    
+                    # Datos de entrada
+                    story.append(Paragraph("<b>Datos de Entrada</b>", styles['Heading2']))
+                    story.append(Paragraph(f"• Consumo mensual promedio: <b>{consumo_promedio:.2f} kWh</b>", styles['Normal']))
+                    story.append(Paragraph(f"• Tarifa promedio (incl. impuestos): <b>${tarifa_promedio:.3f}/kWh</b>", styles['Normal']))
+                    story.append(Paragraph(f"• Objetivo de cobertura: <b>{int(st.session_state.get('objetivo_cobertura', 0)*100)}%</b>", styles['Normal']))
+                    story.append(Spacer(1, 12))
+                    
+                                        
+                    # Dimensionamiento
+                    story.append(Paragraph("<b>Dimensionamiento</b>", styles['Heading2']))
+                    story.append(Paragraph(f"• Tamaño del sistema: <b>{tamano_sistema_kWp:.2f} kWp</b>", styles['Normal']))
+                    story.append(Paragraph(f"• Producción mensual estimada: <b>{produccion_total:.2f} kWh</b>", styles['Normal']))
+                    story.append(Paragraph(f"• Ahorro anual estimado: <b>${ahorro_anual:.2f}</b>", styles['Normal']))
+                    story.append(Spacer(1, 12))
+                                          
+                    # Interpretación
+                    story.append(Paragraph("<b>Interpretación Técnica</b>", styles['Heading2']))
+                    story.append(Paragraph(interpretacion, styles['Normal']))
+                    story.append(Spacer(1, 12))
+                        
+                    # Glosario
+                    story.append(Paragraph("<b>Glosario</b>", styles['Heading2']))
+                    story.append(Paragraph(glosario, styles['Normal']))
+                    story.append(Spacer(1, 12))
+                        
+                    # Pie de página
+                    story.append(Paragraph("Generado automáticamente por la app <b>Solar OnGrid</b> - Alejandro H.", styles['Normal']))
+                        
+                    # Construir PDF
+                    doc.build(story)
+                        
+    
+                    # Crear enlace de descarga
+                    buffer.seek(0)
+                    b64_pdf = base64.b64encode(buffer.read()).decode("utf-8")
+                    href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="reporte_solar.pdf">📄 Descargar reporte PDF</a>'
+                    st.markdown(href, unsafe_allow_html=True)
+                        
             except Exception as e:
                 st.error(f"❌ Error al generar el PDF: {e}")
 
