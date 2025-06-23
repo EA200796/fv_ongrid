@@ -962,8 +962,8 @@ def main ():
                 href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="reporte_solar.pdf">📄 Descargar reporte PDF</a>'
                 st.markdown(href, unsafe_allow_html=True)
                     
-                except Exception as e:
-                    st.error(f"❌ Error al generar el PDF: {e}")
+            except Exception as e:
+                st.error(f"❌ Error al generar el PDF: {e}")
 
             ################
             
