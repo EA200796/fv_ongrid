@@ -946,7 +946,7 @@ def main ():
                     </ul>
                     
                     <h2>Análisis de Consumo Eléctrico Mensual</h2>
-                    <img src="data:image/png;base64,{grafico_consumo_b64}" width="700"/>
+                    <img src="data:image/png;base64,{grafico_consumo_b64}" alt="Gráfico de Consumo"/>
 
                     <h2>Dimensionamiento</h2>
                     <ul>
@@ -955,10 +955,10 @@ def main ():
                         <li>Ahorro anual estimado: <strong>${ahorro_anual:.2f}</strong></li>
                     </ul>
                     <h2>Flujo de Caja del Proyecto</h2>
-                    <img src="data:image/png;base64,{grafico_flujo_b64}" width="700"/>
+                    <img src="data:image/png;base64,{grafico_flujo_b64}" alt="Gráfico de Flujo de Caja"/>
 
                     <h2>Interpretación Técnica</h2>
-                    <img src="data:image/png;base64,{grafico_cobertura_b64}" width="700"/>
+                    <img src="data:image/png;base64,{grafico_cobertura_b64}" alt="Gráfico de Cobertura"/>
                     <p>{interpretacion}</p>
                     
                     <h2>Glosario</h2>
