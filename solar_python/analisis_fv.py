@@ -932,35 +932,35 @@ def main ():
                 story.append(Spacer(1, 12))
                 
                                     
-                    # Dimensionamiento
-                    story.append(Paragraph("<b>Dimensionamiento</b>", styles['Heading2']))
-                    story.append(Paragraph(f"• Tamaño del sistema: <b>{tamano_sistema_kWp:.2f} kWp</b>", styles['Normal']))
-                    story.append(Paragraph(f"• Producción mensual estimada: <b>{produccion_total:.2f} kWh</b>", styles['Normal']))
-                    story.append(Paragraph(f"• Ahorro anual estimado: <b>${ahorro_anual:.2f}</b>", styles['Normal']))
-                    story.append(Spacer(1, 12))
+                # Dimensionamiento
+                story.append(Paragraph("<b>Dimensionamiento</b>", styles['Heading2']))
+                story.append(Paragraph(f"• Tamaño del sistema: <b>{tamano_sistema_kWp:.2f} kWp</b>", styles['Normal']))
+                story.append(Paragraph(f"• Producción mensual estimada: <b>{produccion_total:.2f} kWh</b>", styles['Normal']))
+                story.append(Paragraph(f"• Ahorro anual estimado: <b>${ahorro_anual:.2f}</b>", styles['Normal']))
+                story.append(Spacer(1, 12))
                                       
-                    # Interpretación
-                    story.append(Paragraph("<b>Interpretación Técnica</b>", styles['Heading2']))
-                    story.append(Paragraph(interpretacion, styles['Normal']))
-                    story.append(Spacer(1, 12))
+                # Interpretación
+                story.append(Paragraph("<b>Interpretación Técnica</b>", styles['Heading2']))
+                story.append(Paragraph(interpretacion, styles['Normal']))
+                story.append(Spacer(1, 12))
                     
-                    # Glosario
-                    story.append(Paragraph("<b>Glosario</b>", styles['Heading2']))
-                    story.append(Paragraph(glosario, styles['Normal']))
-                    story.append(Spacer(1, 12))
+                # Glosario
+                story.append(Paragraph("<b>Glosario</b>", styles['Heading2']))
+                story.append(Paragraph(glosario, styles['Normal']))
+                story.append(Spacer(1, 12))
                     
-                    # Pie de página
-                    story.append(Paragraph("Generado automáticamente por la app <b>Solar OnGrid</b> - Alejandro H.", styles['Normal']))
+                # Pie de página
+                story.append(Paragraph("Generado automáticamente por la app <b>Solar OnGrid</b> - Alejandro H.", styles['Normal']))
                     
-                    # Construir PDF
-                    doc.build(story)
+                # Construir PDF
+                doc.build(story)
                     
 
-                    # Crear enlace de descarga
-                    buffer.seek(0)
-                    b64_pdf = base64.b64encode(buffer.read()).decode("utf-8")
-                    href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="reporte_solar.pdf">📄 Descargar reporte PDF</a>'
-                    st.markdown(href, unsafe_allow_html=True)
+                # Crear enlace de descarga
+                buffer.seek(0)
+                b64_pdf = base64.b64encode(buffer.read()).decode("utf-8")
+                href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="reporte_solar.pdf">📄 Descargar reporte PDF</a>'
+                st.markdown(href, unsafe_allow_html=True)
                     
                 except Exception as e:
                     st.error(f"❌ Error al generar el PDF: {e}")
