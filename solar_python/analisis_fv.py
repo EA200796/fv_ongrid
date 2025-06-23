@@ -799,8 +799,8 @@ def main ():
             fig3 = cobertura_solar_para_pdf()
 
             grafico_consumo_b64 = fig1.to_html(full_html=False, include_plotlyjs='cdn')
-            grafico_flujo_b64 = fig2.to_html(full_html=False, include_plotlyjs='cdn')
-            grafico_cobertura_b64 = fig3.to_html(full_html=False, include_plotlyjs='cdn')
+            grafico_flujo_b64 = fig2.to_html(full_html=False, include_plotlyjs=False)
+            grafico_cobertura_b64 = fig3.to_html(full_html=False, include_plotlyjs=False)
 
 
             ###############
